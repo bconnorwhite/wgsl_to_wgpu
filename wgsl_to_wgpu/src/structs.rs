@@ -7,14 +7,32 @@ use syn::{Ident, Index};
 
 use crate::{wgsl::rust_type, WriteOptions};
 
-pub fn structs(module: &naga::Module, options: WriteOptions) -> Vec<TokenStream> {
+pub fn structs(module: &naga::Module, imported_modules: &Vec<naga::Module>, options: WriteOptions) -> Vec<TokenStream> {
     // Initialize the layout calculator provided by naga.
     let mut layouter = naga::proc::Layouter::default();
     layouter.update(module.to_ctx()).unwrap();
 
     let mut global_variable_types = HashSet::new();
-    for g in module.global_variables.iter() {
-        add_types_recursive(&mut global_variable_types, module, g.1.ty);
+    for global_handle in module.global_variables.iter() {
+        let mut was_imported = false;
+        for imported_module in imported_modules {
+            if imported_module
+                .global_variables
+                .iter()
+                .any(|imported_handle| {
+                    imported_handle.1.name == global_handle.1.name
+                        && imported_handle.1.space == global_handle.1.space
+                        && imported_handle.1.binding == global_handle.1.binding
+                        && imported_handle.1.init == global_handle.1.init
+                })
+            {
+                was_imported = true;
+                break;
+            }
+        }
+        if !was_imported {
+            add_types_recursive(&mut global_variable_types, module, global_handle.1.ty);
+        }
     }
 
     // Create matching Rust structs for WGSL structs.
@@ -22,20 +40,13 @@ pub fn structs(module: &naga::Module, options: WriteOptions) -> Vec<TokenStream>
     module
         .types
         .iter()
-        .filter(|(h, _)| {
-            // Check if the struct will need to be used by the user from Rust.
-            // This includes function inputs like vertex attributes and global variables.
-            // Shader stage function outputs will not be accessible from Rust.
-            // Skipping internal structs helps avoid issues deriving encase or bytemuck.
-            !module
-                .entry_points
-                .iter()
-                .any(|e| e.function.result.as_ref().map(|r| r.ty) == Some(*h))
-                && module
-                    .entry_points
-                    .iter()
-                    .any(|e| e.function.arguments.iter().any(|a| a.ty == *h))
-                || global_variable_types.contains(h)
+        .filter(|(_, ty)| {
+            !imported_modules.iter()
+                .any(|imported_module| {
+                    imported_module.types.iter().any(|imported_type| {
+                        imported_type.1.name == ty.name
+                    })
+                })
         })
         .filter_map(|(t_handle, t)| {
             if let naga::TypeInner::Struct { members, .. } = &t.inner {

@@ -154,6 +154,7 @@ fn bind_group_layout_entry(
     // TODO: Support just vertex or fragment?
     // TODO: Visible from all stages?
     let stages = match shader_stages {
+        wgpu::ShaderStages::NONE => quote!(wgpu::ShaderStages::NONE),
         wgpu::ShaderStages::VERTEX_FRAGMENT => quote!(wgpu::ShaderStages::VERTEX_FRAGMENT),
         wgpu::ShaderStages::COMPUTE => quote!(wgpu::ShaderStages::COMPUTE),
         wgpu::ShaderStages::VERTEX => quote!(wgpu::ShaderStages::VERTEX),
@@ -327,9 +328,10 @@ fn bind_group(group_no: u32, group: &GroupData, shader_stages: wgpu::ShaderStage
     }
 }
 
-pub fn get_bind_group_data(
-    module: &naga::Module,
-) -> Result<BTreeMap<u32, GroupData>, CreateModuleError> {
+pub fn get_bind_group_data<'a>(
+    module: &'a naga::Module,
+    imported_modules: &'a Vec<naga::Module>,
+) -> Result<BTreeMap<u32, GroupData<'a>>, CreateModuleError> {
     // Use a BTree to sort type and field names by group index.
     // This isn't strictly necessary but makes the generated code cleaner.
     let mut groups = BTreeMap::new();
@@ -337,38 +339,58 @@ pub fn get_bind_group_data(
     for global_handle in module.global_variables.iter() {
         let global = &module.global_variables[global_handle.0];
         if let Some(binding) = &global.binding {
-            let group = groups.entry(binding.group).or_insert(GroupData {
-                bindings: Vec::new(),
-            });
-            let binding_type = &module.types[module.global_variables[global_handle.0].ty];
-
-            let group_binding = GroupBinding {
-                name: global.name.clone(),
-                binding_index: binding.binding,
-                binding_type,
-                address_space: global.space,
-            };
-            // Repeated bindings will probably cause a compile error.
-            // We'll still check for it here just in case.
-            if group
-                .bindings
-                .iter()
-                .any(|g| g.binding_index == binding.binding)
-            {
-                return Err(CreateModuleError::DuplicateBinding {
-                    binding: binding.binding,
-                });
+            // Filter bindings from the imported modules.
+            let mut was_imported = false;
+            for imported_module in imported_modules {
+                if imported_module
+                    .global_variables
+                    .iter()
+                    .any(|imported_handle| {
+                        imported_handle.1.name == global_handle.1.name
+                            && imported_handle.1.space == global_handle.1.space
+                            && imported_handle.1.binding == global_handle.1.binding
+                            && imported_handle.1.init == global_handle.1.init
+                    })
+                {
+                    was_imported = true;
+                    break;
+                }
             }
-            group.bindings.push(group_binding);
+            if !was_imported {
+                let group = groups.entry(binding.group).or_insert(GroupData {
+                    bindings: Vec::new(),
+                });
+                let binding_type = &module.types[module.global_variables[global_handle.0].ty];
+    
+                let group_binding = GroupBinding {
+                    name: global.name.clone(),
+                    binding_index: binding.binding,
+                    binding_type,
+                    address_space: global.space,
+                };
+                // Repeated bindings will probably cause a compile error.
+                // We'll still check for it here just in case.
+                if group
+                    .bindings
+                    .iter()
+                    .any(|g| g.binding_index == binding.binding)
+                {
+                    return Err(CreateModuleError::DuplicateBinding {
+                        binding: binding.binding,
+                    });
+                }
+                group.bindings.push(group_binding);
+            }
         }
     }
 
     // wgpu expects bind groups to be consecutive starting from 0.
-    if groups.keys().map(|i| *i as usize).eq(0..groups.len()) {
-        Ok(groups)
-    } else {
-        Err(CreateModuleError::NonConsecutiveBindGroups)
-    }
+    // if groups.keys().map(|i| *i as usize).eq(0..groups.len()) {
+    //     Ok(groups)
+    // } else {
+    //     Err(CreateModuleError::NonConsecutiveBindGroups)
+    // }
+    Ok(groups)
 }
 
 #[cfg(test)]
