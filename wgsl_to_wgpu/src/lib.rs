@@ -156,10 +156,9 @@ pub fn create_shader_module_embedded(
 pub fn create_shader_module_with_imports(
     wgsl_source: &str,
     imported_sources: Vec<String>,
-    wgsl_include_path: &str,
     options: WriteOptions,
 ) -> Result<String, CreateModuleError> {
-    create_shader_module_inner(wgsl_source, imported_sources, Some(wgsl_include_path), options)
+    create_shader_module_inner(wgsl_source, imported_sources, None, options)
 }
 
 fn create_shader_module_inner(

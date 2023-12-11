@@ -7,7 +7,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/other.wgsl");
     let wgsl_source = std::fs::read_to_string("src/shader.wgsl").unwrap();
     let other_source = std::fs::read_to_string("src/other.wgsl").unwrap();
-    let source = format!("{}\n{}", wgsl_source, other_source);
+    let source = format!("{}\n{}", other_source, wgsl_source);
 
     // Generate the Rust bindings and write to a file.
     let mut text = String::new();
@@ -31,7 +31,6 @@ fn main() {
     text += &create_shader_module_with_imports(
         &source,
         Vec::from([other_source]),
-        "shader.wgsl",
         WriteOptions {
             derive_bytemuck: true,
             ..Default::default()
