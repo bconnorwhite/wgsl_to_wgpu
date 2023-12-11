@@ -120,7 +120,7 @@ pub fn create_shader_module(
     wgsl_include_path: &str,
     options: WriteOptions,
 ) -> Result<String, CreateModuleError> {
-    create_shader_module_inner(wgsl_source, Some(wgsl_include_path), options)
+    create_shader_module_inner(wgsl_source, Vec::new(), Some(wgsl_include_path), options)
 }
 
 /// Generates a Rust module for a WGSL shader embedded as a string literal.
@@ -150,21 +150,35 @@ pub fn create_shader_module_embedded(
     wgsl_source: &str,
     options: WriteOptions,
 ) -> Result<String, CreateModuleError> {
-    create_shader_module_inner(wgsl_source, None, options)
+    create_shader_module_inner(wgsl_source, Vec::new(), None, options)
+}
+
+pub fn create_shader_module_with_imports(
+    wgsl_source: &str,
+    imported_sources: Vec<String>,
+    wgsl_include_path: &str,
+    options: WriteOptions,
+) -> Result<String, CreateModuleError> {
+    create_shader_module_inner(wgsl_source, imported_sources, Some(wgsl_include_path), options)
 }
 
 fn create_shader_module_inner(
     wgsl_source: &str,
+    imported_sources: Vec<String>,
     wgsl_include_path: Option<&str>,
     options: WriteOptions,
 ) -> Result<String, CreateModuleError> {
     let module = naga::front::wgsl::parse_str(wgsl_source).unwrap();
 
-    let bind_group_data = get_bind_group_data(&module)?;
+    let imported_modules = imported_sources.iter().map(|source| {
+        naga::front::wgsl::parse_str(source).unwrap()
+    }).collect::<Vec<_>>();
+
+    let bind_group_data = get_bind_group_data(&module, &imported_modules)?;
     let shader_stages = wgsl::shader_stages(&module);
 
     // Write all the structs, including uniforms and entry function inputs.
-    let structs = structs::structs(&module, options);
+    let structs = structs::structs(&module, &imported_modules, options);
     let consts = consts::consts(&module);
     let bind_groups_module = bind_groups_module(&bind_group_data, shader_stages);
     let vertex_module = vertex_module(&module);
@@ -177,16 +191,6 @@ fn create_shader_module_inner(
         .map(|p| quote!(include_str!(#p)))
         .unwrap_or_else(|| quote!(#wgsl_source));
 
-    let create_shader_module = quote! {
-        pub fn create_shader_module(device: &wgpu::Device) -> wgpu::ShaderModule {
-            let source = std::borrow::Cow::Borrowed(#included_source);
-            device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(source)
-            })
-        }
-    };
-
     let bind_group_layouts: Vec<_> = bind_group_data
         .keys()
         .map(|group_no| {
@@ -195,15 +199,33 @@ fn create_shader_module_inner(
         })
         .collect();
 
-    let create_pipeline_layout = quote! {
-        pub fn create_pipeline_layout(device: &wgpu::Device) -> wgpu::PipelineLayout {
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[
-                    #(&#bind_group_layouts),*
-                ],
-                push_constant_ranges: &[],
-            })
+    let create_shader_module = if shader_stages == wgpu::ShaderStages::NONE {
+        TokenStream::new()
+    } else {
+        quote! {
+            pub fn create_shader_module(device: &wgpu::Device) -> wgpu::ShaderModule {
+                let source = std::borrow::Cow::Borrowed(#included_source);
+                device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: None,
+                    source: wgpu::ShaderSource::Wgsl(source)
+                })
+            }
+        }
+    };
+
+    let create_pipeline_layout = if shader_stages == wgpu::ShaderStages::NONE {
+        TokenStream::new()
+    } else {
+        quote! {
+            pub fn create_pipeline_layout(device: &wgpu::Device) -> wgpu::PipelineLayout {
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: None,
+                    bind_group_layouts: &[
+                        #(&#bind_group_layouts),*
+                    ],
+                    push_constant_ranges: &[],
+                })
+            }
         }
     };
 
