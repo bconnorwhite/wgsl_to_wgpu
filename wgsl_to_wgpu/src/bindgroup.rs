@@ -411,7 +411,7 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        assert_eq!(3, get_bind_group_data(&module).unwrap().len());
+        assert_eq!(3, get_bind_group_data(&module, &Vec::new()).unwrap().len());
     }
 
     #[test]
@@ -425,7 +425,7 @@ mod tests {
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
         assert!(matches!(
-            get_bind_group_data(&module),
+            get_bind_group_data(&module, &Vec::new()),
             Err(CreateModuleError::NonConsecutiveBindGroups)
         ));
     }
@@ -443,7 +443,7 @@ mod tests {
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
         assert!(matches!(
-            get_bind_group_data(&module),
+            get_bind_group_data(&module, &Vec::new()),
             Err(CreateModuleError::NonConsecutiveBindGroups)
         ));
     }
@@ -469,7 +469,8 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        let bind_group_data = get_bind_group_data(&module).unwrap();
+        let imports = Vec::new();
+        let bind_group_data = get_bind_group_data(&module, &imports).unwrap();
 
         let actual = bind_groups_module(&bind_group_data, wgpu::ShaderStages::COMPUTE);
 
@@ -662,7 +663,8 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        let bind_group_data = get_bind_group_data(&module).unwrap();
+        let imports = Vec::new();
+        let bind_group_data = get_bind_group_data(&module, &imports).unwrap();
 
         let actual = bind_groups_module(&bind_group_data, wgpu::ShaderStages::VERTEX_FRAGMENT);
 
@@ -928,7 +930,8 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        let bind_group_data = get_bind_group_data(&module).unwrap();
+        let imports = Vec::new();
+        let bind_group_data = get_bind_group_data(&module, &imports).unwrap();
 
         let actual = bind_groups_module(&bind_group_data, wgpu::ShaderStages::VERTEX);
 
@@ -1011,7 +1014,8 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        let bind_group_data = get_bind_group_data(&module).unwrap();
+        let imports = Vec::new();
+        let bind_group_data = get_bind_group_data(&module, &imports).unwrap();
 
         let actual = bind_groups_module(&bind_group_data, wgpu::ShaderStages::FRAGMENT);
 
@@ -1096,7 +1100,8 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        let bind_group_data = get_bind_group_data(&module).unwrap();
+        let imports = Vec::new();
+        let bind_group_data = get_bind_group_data(&module, &imports).unwrap();
 
         let actual = set_bind_groups(&bind_group_data, false);
 
@@ -1129,7 +1134,8 @@ mod tests {
         "#};
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
-        let bind_group_data = get_bind_group_data(&module).unwrap();
+        let imports = Vec::new();
+        let bind_group_data = get_bind_group_data(&module, &imports).unwrap();
 
         let actual = set_bind_groups(&bind_group_data, true);
 

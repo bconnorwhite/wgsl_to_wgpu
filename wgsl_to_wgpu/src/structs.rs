@@ -324,7 +324,7 @@ mod tests {
 
         let module = naga::front::wgsl::parse_str(source).unwrap();
 
-        let structs = structs(&module, WriteOptions::default());
+        let structs = structs(&module, &Vec::new(), WriteOptions::default());
         let actual = quote!(#(#structs)*);
 
         assert_tokens_eq!(
@@ -493,6 +493,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 matrix_vector_types: MatrixVectorTypes::Glam,
                 ..Default::default()
@@ -666,6 +667,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 matrix_vector_types: MatrixVectorTypes::Nalgebra,
                 ..Default::default()
@@ -779,6 +781,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: true,
                 derive_bytemuck: true,
@@ -871,6 +874,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: true,
                 derive_bytemuck: true,
@@ -969,6 +973,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: false,
                 derive_bytemuck: false,
@@ -1013,6 +1018,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: false,
                 derive_bytemuck: true,
@@ -1070,6 +1076,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: false,
                 derive_bytemuck: true,
@@ -1143,6 +1150,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 matrix_vector_types: MatrixVectorTypes::Nalgebra,
                 ..Default::default()
@@ -1182,6 +1190,7 @@ mod tests {
 
         let structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: true,
                 ..Default::default()
@@ -1209,6 +1218,7 @@ mod tests {
 
         let _structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 ..Default::default()
             },
@@ -1222,6 +1232,7 @@ mod tests {
 
         let _structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: true,
                 derive_bytemuck: true,
@@ -1247,6 +1258,7 @@ mod tests {
 
         let _structs = structs(
             &module,
+            &Vec::new(),
             WriteOptions {
                 derive_encase: true,
                 ..Default::default()
