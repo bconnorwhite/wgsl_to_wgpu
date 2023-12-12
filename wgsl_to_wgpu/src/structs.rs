@@ -7,7 +7,7 @@ use syn::{Ident, Index};
 
 use crate::{wgsl::rust_type, WriteOptions};
 
-pub fn structs(module: &naga::Module, imported_modules: &Vec<naga::Module>, options: WriteOptions) -> Vec<TokenStream> {
+pub fn structs(module: &naga::Module, imported_modules: &Vec<(&String, naga::Module)>, options: WriteOptions) -> Vec<TokenStream> {
     // Initialize the layout calculator provided by naga.
     let mut layouter = naga::proc::Layouter::default();
     layouter.update(module.to_ctx()).unwrap();
@@ -15,7 +15,7 @@ pub fn structs(module: &naga::Module, imported_modules: &Vec<naga::Module>, opti
     let mut global_variable_types = HashSet::new();
     for global_handle in module.global_variables.iter() {
         let mut was_imported = false;
-        for imported_module in imported_modules {
+        for (_, imported_module) in imported_modules {
             if imported_module
                 .global_variables
                 .iter()
@@ -42,7 +42,7 @@ pub fn structs(module: &naga::Module, imported_modules: &Vec<naga::Module>, opti
         .iter()
         .filter(|(_, ty)| {
             !imported_modules.iter()
-                .any(|imported_module| {
+                .any(|(_, imported_module)| {
                     imported_module.types.iter().any(|imported_type| {
                         imported_type.1.name == ty.name
                     })

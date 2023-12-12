@@ -131,7 +131,7 @@ pub fn vs_main_entry(vertex_input: wgpu::VertexStepMode) -> VertexEntry<1> {
 }
 pub fn create_shader_module(device: &wgpu::Device) -> wgpu::ShaderModule {
     let source = std::borrow::Cow::Borrowed(
-        "struct Uniforms {\n    color_rgb: vec4<f32>,\n}\n\n@group(1) @binding(0)\nvar<uniform> uniforms: Uniforms;\n\n//!import ./other.wgsl\n\nstruct VertexInput {\n    @location(0) position: vec3<f32>,\n};\n\n\nstruct VertexOutput {\n    @builtin(position) clip_position: vec4<f32>,\n    @location(0) tex_coords: vec2<f32>\n};\n\n@vertex\nfn vs_main(in: VertexInput) -> VertexOutput {\n    // A fullscreen triangle.\n    var out: VertexOutput;\n    out.clip_position = vec4(in.position.xyz, 1.0);\n    out.tex_coords = in.position.xy * 0.5 + 0.5;\n    return out;\n}\n\n@group(0) @binding(0)\nvar color_texture: texture_2d<f32>;\n@group(0) @binding(1)\nvar color_sampler: sampler;\n\n@fragment\nfn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {\n    let color = textureSample(color_texture, color_sampler, in.tex_coords).rgb;\n    return vec4(color * uniforms.color_rgb.rgb, 1.0);\n}\n",
+        "struct Uniforms {\n    color_rgb: vec4<f32>,\n}\n\n@group(1) @binding(0)\nvar<uniform> uniforms: Uniforms;\n\n//!import ./other.wgsl\n\nstruct VertexInput {\n    @location(0) position: vec3<f32>,\n};\n\nstruct VertexOutput {\n    @builtin(position) clip_position: vec4<f32>,\n    @location(0) tex_coords: vec2<f32>\n};\n\n@vertex\nfn vs_main(in: VertexInput) -> VertexOutput {\n    // A fullscreen triangle.\n    var out: VertexOutput;\n    out.clip_position = vec4(in.position.xyz, 1.0);\n    out.tex_coords = in.position.xy * 0.5 + 0.5;\n    return out;\n}\n\n@group(0) @binding(0)\nvar color_texture: texture_2d<f32>;\n@group(0) @binding(1)\nvar color_sampler: sampler;\n\n@fragment\nfn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {\n    let color = textureSample(color_texture, color_sampler, in.tex_coords).rgb;\n    return vec4(color * uniforms.color_rgb.rgb, 1.0);\n}\n",
     );
     device
         .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -146,6 +146,7 @@ pub fn create_pipeline_layout(device: &wgpu::Device) -> wgpu::PipelineLayout {
                 label: None,
                 bind_group_layouts: &[
                     &bind_groups::BindGroup0::get_bind_group_layout(device),
+                    &super::other::bind_groups::BindGroup1::get_bind_group_layout(device),
                 ],
                 push_constant_ranges: &[],
             },

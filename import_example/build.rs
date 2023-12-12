@@ -30,7 +30,9 @@ fn main() {
     writeln!(&mut text, "// Changes made to this file will not be saved.").unwrap();
     text += &create_shader_module_with_imports(
         &source,
-        Vec::from([other_source]),
+        Vec::from([
+            ("super::other".to_string(), other_source)
+        ]),
         WriteOptions {
             derive_bytemuck: true,
             ..Default::default()

@@ -155,7 +155,7 @@ pub fn create_shader_module_embedded(
 
 pub fn create_shader_module_with_imports(
     wgsl_source: &str,
-    imported_sources: Vec<String>,
+    imported_sources: Vec<(String, String)>, // (name, source)
     options: WriteOptions,
 ) -> Result<String, CreateModuleError> {
     create_shader_module_inner(wgsl_source, imported_sources, None, options)
@@ -163,14 +163,14 @@ pub fn create_shader_module_with_imports(
 
 fn create_shader_module_inner(
     wgsl_source: &str,
-    imported_sources: Vec<String>,
+    imported_sources: Vec<(String, String)>,
     wgsl_include_path: Option<&str>,
     options: WriteOptions,
 ) -> Result<String, CreateModuleError> {
     let module = naga::front::wgsl::parse_str(wgsl_source).unwrap();
 
-    let imported_modules = imported_sources.iter().map(|source| {
-        naga::front::wgsl::parse_str(source).unwrap()
+    let imported_modules = imported_sources.iter().map(|(name, source)| {
+       (name, naga::front::wgsl::parse_str(source).unwrap())
     }).collect::<Vec<_>>();
 
     let bind_group_data = get_bind_group_data(&module, &imported_modules)?;
@@ -190,11 +190,17 @@ fn create_shader_module_inner(
         .map(|p| quote!(include_str!(#p)))
         .unwrap_or_else(|| quote!(#wgsl_source));
 
+    // For the `create_pipeline_layout`, we want to include imported modules
     let bind_group_layouts: Vec<_> = bind_group_data
-        .keys()
-        .map(|group_no| {
+        .iter()
+        .map(|(group_no, (name, _))| {
             let group = indexed_name_to_ident("BindGroup", *group_no);
-            quote!(bind_groups::#group::get_bind_group_layout(device))
+            if let Some(name) = name {
+                let path: syn::Path = syn::parse_str(name).unwrap();
+                quote!(#path::bind_groups::#group::get_bind_group_layout(device))
+            } else {
+                quote!(bind_groups::#group::get_bind_group_layout(device))
+            }
         })
         .collect();
 

@@ -17,34 +17,40 @@ pub struct GroupBinding<'a> {
 
 // TODO: Take an iterator instead?
 pub fn bind_groups_module(
-    bind_group_data: &BTreeMap<u32, GroupData>,
+    bind_group_data: &BTreeMap<u32, (Option<String>, GroupData)>,
     shader_stages: wgpu::ShaderStages,
 ) -> TokenStream {
     let bind_groups: Vec<_> = bind_group_data
         .iter()
-        .map(|(group_no, group)| {
+        .filter_map(|(group_no, (name, group))| {
+            if name.is_some() {
+                return None;
+            }
             let group_name = indexed_name_to_ident("BindGroup", *group_no);
 
             let layout = bind_group_layout(*group_no, group);
             let layout_descriptor = bind_group_layout_descriptor(*group_no, group, shader_stages);
             let group_impl = bind_group(*group_no, group, shader_stages);
 
-            quote! {
+            Some(quote! {
                 #[derive(Debug)]
                 pub struct #group_name(wgpu::BindGroup);
                 #layout
                 #layout_descriptor
                 #group_impl
-            }
+            })
         })
         .collect();
 
     let bind_group_fields: Vec<_> = bind_group_data
-        .keys()
-        .map(|group_no| {
+        .iter()
+        .filter_map(|(group_no, (name, _))| {
+            if name.is_some() {
+                return None;
+            }
             let group_name = indexed_name_to_ident("BindGroup", *group_no);
             let field = indexed_name_to_ident("bind_group", *group_no);
-            quote!(pub #field: &'a #group_name)
+            Some(quote!(pub #field: &'a #group_name))
         })
         .collect();
 
@@ -71,7 +77,7 @@ pub fn bind_groups_module(
     }
 }
 
-fn set_bind_groups(bind_group_data: &BTreeMap<u32, GroupData>, is_compute: bool) -> TokenStream {
+fn set_bind_groups(bind_group_data: &BTreeMap<u32, (Option<String>, GroupData)>, is_compute: bool) -> TokenStream {
     let render_pass = if is_compute {
         quote!(wgpu::ComputePass<'a>)
     } else {
@@ -80,10 +86,13 @@ fn set_bind_groups(bind_group_data: &BTreeMap<u32, GroupData>, is_compute: bool)
 
     // The set function for each bind group already sets the index.
     let groups: Vec<_> = bind_group_data
-        .keys()
-        .map(|group_no| {
+        .iter()
+        .filter_map(|(group_no, (name, _))| {
+            if name.is_some() {
+                return None;
+            }
             let group = indexed_name_to_ident("bind_group", *group_no);
-            quote!(bind_groups.#group.set(pass);)
+            Some(quote!(bind_groups.#group.set(pass);))
         })
         .collect();
 
@@ -330,8 +339,8 @@ fn bind_group(group_no: u32, group: &GroupData, shader_stages: wgpu::ShaderStage
 
 pub fn get_bind_group_data<'a>(
     module: &'a naga::Module,
-    imported_modules: &'a Vec<naga::Module>,
-) -> Result<BTreeMap<u32, GroupData<'a>>, CreateModuleError> {
+    imported_modules: &'a Vec<(&String, naga::Module)>,
+) -> Result<BTreeMap<u32, (Option<String>, GroupData<'a>)>, CreateModuleError> {
     // Use a BTree to sort type and field names by group index.
     // This isn't strictly necessary but makes the generated code cleaner.
     let mut groups = BTreeMap::new();
@@ -340,8 +349,8 @@ pub fn get_bind_group_data<'a>(
         let global = &module.global_variables[global_handle.0];
         if let Some(binding) = &global.binding {
             // Filter bindings from the imported modules.
-            let mut was_imported = false;
-            for imported_module in imported_modules {
+            let mut group_module_name: Option<String> = None;
+            for (name, imported_module) in imported_modules {
                 if imported_module
                     .global_variables
                     .iter()
@@ -352,35 +361,33 @@ pub fn get_bind_group_data<'a>(
                             && imported_handle.1.init == global_handle.1.init
                     })
                 {
-                    was_imported = true;
+                    group_module_name = Some(name.to_string());
                     break;
                 }
             }
-            if !was_imported {
-                let group = groups.entry(binding.group).or_insert(GroupData {
-                    bindings: Vec::new(),
+            let group = groups.entry(binding.group).or_insert((group_module_name, GroupData {
+                bindings: Vec::new(),
+            }));
+            let binding_type = &module.types[module.global_variables[global_handle.0].ty];
+
+            let group_binding = GroupBinding {
+                name: global.name.clone(),
+                binding_index: binding.binding,
+                binding_type,
+                address_space: global.space,
+            };
+            // Repeated bindings will probably cause a compile error.
+            // We'll still check for it here just in case.
+            if group.1
+                .bindings
+                .iter()
+                .any(|g| g.binding_index == binding.binding)
+            {
+                return Err(CreateModuleError::DuplicateBinding {
+                    binding: binding.binding,
                 });
-                let binding_type = &module.types[module.global_variables[global_handle.0].ty];
-    
-                let group_binding = GroupBinding {
-                    name: global.name.clone(),
-                    binding_index: binding.binding,
-                    binding_type,
-                    address_space: global.space,
-                };
-                // Repeated bindings will probably cause a compile error.
-                // We'll still check for it here just in case.
-                if group
-                    .bindings
-                    .iter()
-                    .any(|g| g.binding_index == binding.binding)
-                {
-                    return Err(CreateModuleError::DuplicateBinding {
-                        binding: binding.binding,
-                    });
-                }
-                group.bindings.push(group_binding);
             }
+            group.1.bindings.push(group_binding);
         }
     }
 
