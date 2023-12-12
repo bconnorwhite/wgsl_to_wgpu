@@ -154,7 +154,7 @@ fn bind_group_layout_entry(
     // TODO: Support just vertex or fragment?
     // TODO: Visible from all stages?
     let stages = match shader_stages {
-        wgpu::ShaderStages::NONE => quote!(wgpu::ShaderStages::NONE),
+        wgpu::ShaderStages::NONE => quote!(wgpu::ShaderStages::VERTEX_FRAGMENT),
         wgpu::ShaderStages::VERTEX_FRAGMENT => quote!(wgpu::ShaderStages::VERTEX_FRAGMENT),
         wgpu::ShaderStages::COMPUTE => quote!(wgpu::ShaderStages::COMPUTE),
         wgpu::ShaderStages::VERTEX => quote!(wgpu::ShaderStages::VERTEX),
